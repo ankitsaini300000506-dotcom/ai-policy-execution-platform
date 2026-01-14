@@ -97,11 +97,3 @@ uvicorn main:app --reload
 |-----------|------------|
 | ![Dashboard](https://via.placeholder.com/400x200?text=Dashboard) | ![Results](https://via.placeholder.com/400x200?text=Results) |
 
-## 🤝 Contributors
-
-- **Ankit Saini** - *Lead Developer*
-- **Team** - *AI & Backend Integration*
-
----
-
-*Built with ❤️ for [Hackathon Name]*
