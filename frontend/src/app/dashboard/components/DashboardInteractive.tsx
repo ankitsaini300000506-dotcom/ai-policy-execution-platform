@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import MetricsCard from './MetricsCard';
+import Icon from '@/components/ui/AppIcon';
 import SystemHealthMonitor from './SystemHealthMonitor';
 import ActivityTimeline from './ActivityTimeline';
 import PerformanceChart from './PerformanceChart';
@@ -11,7 +12,7 @@ import APIUsageStats from './APIUsageStats';
 import RoleBasedTasks, { Task } from './RoleBasedTasks';
 import AuditLogView, { AuditLog } from './AuditLogView';
 import SystemOverview from './SystemOverview';
-import { fetchTasks, updateTaskStatus, escalateTask, fetchAuditLogs, fetchRecentActivity, fetchPolicyStats, BackendTask, ActivityEvent } from '@/lib/api';
+import { fetchTasks, updateTaskStatus, escalateTask, fetchAuditLogs, fetchRecentActivity, fetchPolicyStats, fetchPerformanceStats, fetchStorageStats, fetchSystemHealth, BackendTask, ActivityEvent } from '@/lib/api';
 
 const DashboardInteractive = () => {
   const [isHydrated, setIsHydrated] = useState(false);
@@ -35,20 +36,6 @@ const DashboardInteractive = () => {
   const [policyStats, setPolicyStats] = useState({ total: 0, active: 0 });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
-  // Fetch Policy Stats
-  useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const stats = await fetchPolicyStats();
-        setPolicyStats(stats);
-      } catch (error) {
-        console.error('Failed to load policy stats', error);
-      }
-    };
-    if (isHydrated) loadStats();
-  }, [isHydrated]);
-
-  // Fetch Recent Activity
   useEffect(() => {
     const loadActivity = async () => {
       try {
@@ -58,8 +45,8 @@ const DashboardInteractive = () => {
         const formattedActivity = activity.map((event: ActivityEvent, index: number) => ({
           id: index,
           type: 'process', // Default type
-          title: event.action,
-          description: event.details,
+          title: event.action || 'Unknown Action', // Handle missing action
+          description: event.details || 'No details', // Handle missing details
           timestamp: event.timestamp,
           user: event.user || 'System',
           status: 'completed'
@@ -80,12 +67,18 @@ const DashboardInteractive = () => {
       try {
         setIsLoadingAuditLogs(true);
         const logs = await fetchAuditLogs();
-        // Map backend logs if necessary, or use as is if format matches
-        // Assuming backend returns array of AuditLog objects
-        setAuditLogs(logs);
+        // Map backend logs to frontend AuditLog format
+        const formattedLogs: AuditLog[] = logs.map((log: any) => ({
+          id: log.id || `L${Date.now()}-${Math.random()}`,
+          taskId: log.task_id || 'Unknown',
+          action: log.action,
+          role: log.role || 'System',
+          time: log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'
+        }));
+        setAuditLogs(formattedLogs);
       } catch (error) {
         console.error('Failed to load audit logs', error);
-        setAuditLogs([]); // Ensure empty array on error
+        setAuditLogs([]);
       } finally {
         setIsLoadingAuditLogs(false);
       }
@@ -93,54 +86,46 @@ const DashboardInteractive = () => {
     if (isHydrated) loadAuditLogs();
   }, [isHydrated]);
 
+  // ... (rest of the component)
 
 
-  const healthMetrics = [
-    {
-      name: 'API Response Time',
-      status: 'healthy' as const,
-      value: '124ms avg',
-      icon: 'ClockIcon'
-    },
-    {
-      name: 'Database Performance',
-      status: 'healthy' as const,
-      value: '99.9% uptime',
-      icon: 'CircleStackIcon'
-    },
-    {
-      name: 'WebGL Rendering',
-      status: 'healthy' as const,
-      value: '60 FPS',
-      icon: 'CpuChipIcon'
-    },
-    {
-      name: 'Memory Usage',
-      status: 'warning' as const,
-      value: '78% utilized',
-      icon: 'ServerIcon'
-    }];
 
+
+  const [performanceData, setPerformanceData] = useState<any[]>([]);
+  const [storageStats, setStorageStats] = useState<any>({ breakdown: [], total_storage_gb: 0, used_storage_gb: 0 });
+  const [apiUsageData, setApiUsageData] = useState<any[]>([]);
+  const [healthMetrics, setHealthMetrics] = useState<any[]>([]);
+
+  // Fetch Dashboard Analytics
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        const [perf, storage, health] = await Promise.all([
+          fetchPerformanceStats(),
+          fetchStorageStats(),
+          fetchSystemHealth()
+        ]);
+
+        setPerformanceData(perf.data);
+        setStorageStats(storage);
+        setHealthMetrics(health.metrics);
+      } catch (error) {
+        console.error('Failed to load dashboard analytics', error);
+      }
+    };
+
+    if (isHydrated) {
+      loadDashboardData();
+    }
+  }, [isHydrated]);
 
   // Removed mock timelineEvents, using recentActivity state instead
 
 
-  const chartData = [
-    { name: 'Mon', uploads: 45, processed: 42, exported: 38 },
-    { name: 'Tue', uploads: 52, processed: 48, exported: 45 },
-    { name: 'Wed', uploads: 61, processed: 58, exported: 54 },
-    { name: 'Thu', uploads: 48, processed: 45, exported: 42 },
-    { name: 'Fri', uploads: 73, processed: 70, exported: 67 },
-    { name: 'Sat', uploads: 38, processed: 35, exported: 32 },
-    { name: 'Sun', uploads: 29, processed: 27, exported: 24 }];
+  // Removed hardcoded chartData, using performanceData state instead
 
 
-  const storageData = [
-    { name: 'Documents', value: 45.2, color: '#00FFFF' },
-    { name: 'Processed Data', value: 28.7, color: '#8A2BE2' },
-    { name: 'Exports', value: 15.3, color: '#00FF88' },
-    { name: 'Cache', value: 8.4, color: '#FF6B00' },
-    { name: 'Available', value: 2.4, color: '#2A2A2A' }];
+  // Removed hardcoded storageData, using storageData state instead
 
 
   const quickActions = [
@@ -178,35 +163,7 @@ const DashboardInteractive = () => {
     }];
 
 
-  const apiEndpoints = [
-    {
-      name: '/api/upload',
-      calls: 1247,
-      avgResponse: '145ms',
-      successRate: '99.2%',
-      status: 'healthy' as const
-    },
-    {
-      name: '/api/process',
-      calls: 1189,
-      avgResponse: '2.4s',
-      successRate: '98.7%',
-      status: 'healthy' as const
-    },
-    {
-      name: '/api/extract-rules',
-      calls: 1189,
-      avgResponse: '1.8s',
-      successRate: '97.3%',
-      status: 'warning' as const
-    },
-    {
-      name: '/api/export',
-      calls: 1124,
-      avgResponse: '320ms',
-      successRate: '99.8%',
-      status: 'healthy' as const
-    }];
+  // Removed hardcoded apiEndpoints, using apiUsageData state instead
 
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -351,6 +308,21 @@ const DashboardInteractive = () => {
     }
   };
 
+  const [hasValidData, setHasValidData] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const policyId = localStorage.getItem('policyId');
+      const storedResults = localStorage.getItem('processingResults');
+
+      if (policyId && storedResults) {
+        setHasValidData(true);
+      } else {
+        setHasValidData(false);
+      }
+    }
+  }, []);
+
   if (!isHydrated) {
     return (
       <div className="min-h-screen bg-background pt-24 px-6">
@@ -365,8 +337,11 @@ const DashboardInteractive = () => {
           </div>
         </div>
       </div>);
-
   }
+
+  // Empty state - no policy data
+  // Removed blocking check to allow system dashboard to load
+  // if (!hasValidData) { ... }
 
   return (
     <div className="min-h-screen bg-background pt-24 px-6 pb-12">
@@ -388,31 +363,38 @@ const DashboardInteractive = () => {
           </div>
         </div>
 
-        <SystemOverview stats={systemStats} />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {metricsData.map((metric, index) =>
-            <MetricsCard key={index} {...metric} />
-          )}
-        </div>
+        {/* Show upload prompt if no data, but don't block dashboard */}
+        {!hasValidData && (
+          <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Icon name="InformationCircleIcon" size={24} className="text-cyan-500" />
+              <div>
+                <h3 className="font-bold text-cyan-500">No Active Policy Session</h3>
+                <p className="text-sm text-muted-foreground">Upload a document to see session-specific analytics. Showing system-wide data below.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => window.location.href = '/upload'}
+              className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black text-sm font-bold rounded-lg transition-colors"
+            >
+              Upload New
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <SystemHealthMonitor metrics={healthMetrics} />
           <ActivityTimeline events={recentActivity} />
         </div>
 
-        <PerformanceChart data={chartData} />
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <StorageUtilization
-            data={storageData}
-            totalStorage="100 GB"
-            usedStorage="97.6" />
+            data={storageStats.breakdown || []}
+            totalStorage={`${storageStats.total_storage_gb || 0} GB`}
+            usedStorage={`${storageStats.used_storage_gb || 0}`} />
 
           <QuickActions actions={quickActions} />
         </div>
-
-        <APIUsageStats endpoints={apiEndpoints} />
 
         {isLoadingTasks ? (
           <div className="bg-card rounded-lg p-8 text-center">

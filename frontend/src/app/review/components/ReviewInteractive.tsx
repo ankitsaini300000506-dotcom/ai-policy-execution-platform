@@ -50,6 +50,7 @@ const ReviewInteractive = () => {
   const [isDraftSaved, setIsDraftSaved] = useState(false);
   const [showTaskSummary, setShowTaskSummary] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [hasValidData, setHasValidData] = useState(false);
 
   const formFields: FormFieldConfig[] = [
     {
@@ -119,15 +120,6 @@ const ReviewInteractive = () => {
       section: 'compliance',
     },
     {
-      id: 'regulatoryFramework',
-      label: 'Regulatory Framework',
-      type: 'select',
-      options: ['GDPR', 'HIPAA', 'SOX', 'ISO 27001', 'NIST', 'Other'],
-      required: false,
-      placeholder: '',
-      section: 'compliance',
-    },
-    {
       id: 'reviewFrequency',
       label: 'Review Frequency (months)',
       type: 'number',
@@ -153,7 +145,16 @@ const ReviewInteractive = () => {
     if (storedResults) {
       try {
         const data: NLPResponse = JSON.parse(storedResults);
+
+        // Validate data structure
+        if (!data || !data.policy_id || !data.rules) {
+          console.warn('⚠️ Invalid NLP data structure');
+          setHasValidData(false);
+          return;
+        }
+
         setNlpData(data);
+        setHasValidData(true);
 
         // Map NLP rules to ambiguities
         const extractedAmbiguities: Ambiguity[] = data.rules
@@ -175,7 +176,11 @@ const ReviewInteractive = () => {
         }));
       } catch (e) {
         console.error('Error parsing NLP results:', e);
+        setHasValidData(false);
       }
+    } else {
+      console.warn('⚠️ No NLP results found in localStorage');
+      setHasValidData(false);
     }
 
     const initialData: FormData = {};
@@ -190,6 +195,49 @@ const ReviewInteractive = () => {
       <div className="min-h-screen bg-background pt-24 pb-16 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="h-64 bg-card rounded-lg animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state - no NLP data
+  if (!hasValidData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="max-w-2xl w-full text-center space-y-8">
+          <div className="space-y-4">
+            <div className="w-24 h-24 mx-auto rounded-full bg-muted flex items-center justify-center">
+              <Icon name="ExclamationTriangleIcon" size={48} className="text-warning" />
+            </div>
+            <h1 className="text-4xl font-bold font-orbitron text-foreground">
+              No Policy Data Found
+            </h1>
+            <p className="text-lg text-muted-foreground font-inter max-w-md mx-auto">
+              Please upload and process a policy document before accessing the review page.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={() => router.push('/upload')}
+              className="px-8 py-4 bg-cyan-500 hover:bg-cyan-400 text-black font-bold font-orbitron rounded-xl transition-all hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/20 flex items-center justify-center gap-2"
+            >
+              <Icon name="ArrowUpTrayIcon" size={20} />
+              Upload Document
+            </button>
+            <button
+              onClick={() => router.push('/processing')}
+              className="px-8 py-4 bg-card hover:bg-muted text-foreground font-bold font-orbitron rounded-xl transition-all hover:scale-105 border border-white/10"
+            >
+              Go to Processing
+            </button>
+          </div>
+
+          <div className="pt-8 border-t border-white/5">
+            <p className="text-sm text-muted-foreground font-jetbrains">
+              💡 Tip: The Review page allows you to complete policy forms and resolve ambiguities detected by the AI.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -263,8 +311,20 @@ const ReviewInteractive = () => {
       // Submit policy to sync with execution backend
       if (nlpData) {
         console.log('📤 Submitting policy to execution backend...');
-        await submitPolicy(nlpData.policy_id);
+        const response = await submitPolicy(nlpData.policy_id);
         console.log('✅ Policy successfully synced to execution backend!');
+
+        // Use actual tasks from backend response
+        if (response.backend_response && Array.isArray(response.backend_response)) {
+          const backendTasks = response.backend_response.map((t: any) => ({
+            id: t.task_id,
+            policyId: t.policy_id,
+            ruleId: t.rule_id, // Ensure rule_id is mapped
+            assignedRole: t.assigned_role,
+            status: t.status
+          }));
+          setTasks(backendTasks);
+        }
       }
     } catch (error) {
       console.error('❌ Error submitting policy:', error);
@@ -274,13 +334,7 @@ const ReviewInteractive = () => {
 
     setShowSuccessConfetti(true);
 
-    // Simulate task creation from backend
-    const mockTasks: Task[] = [
-      { id: 'T001', policyId: formData.policyNumber || 'P-2026-X', ruleId: 'R-001', assignedRole: 'Clerk', status: 'CREATED' },
-      { id: 'T002', policyId: formData.policyNumber || 'P-2026-X', ruleId: 'R-005', assignedRole: 'Officer', status: 'CREATED' },
-      { id: 'T003', policyId: formData.policyNumber || 'P-2026-X', ruleId: 'R-012', assignedRole: 'Manager', status: 'CREATED' },
-    ];
-    setTasks(mockTasks);
+    // Removed mock task generation
 
     setTimeout(() => {
       setShowSuccessConfetti(false);

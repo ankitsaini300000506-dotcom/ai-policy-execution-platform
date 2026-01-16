@@ -53,7 +53,7 @@ const ProcessingInteractive = () => {
 
                 const policyId = `POL_${Date.now()}`;
                 console.log('  - Policy ID:', policyId);
-                console.log('  - API URL:', 'https://sharp-words-rule.loca.lt/api/policy/process');
+                console.log('  - Policy ID:', policyId);
 
                 console.log('🚀 Sending request to NLP backend...');
                 const data = await uploadPolicy(file, policyId);
@@ -72,6 +72,8 @@ const ProcessingInteractive = () => {
 
                 // Store results for the Review Page
                 localStorage.setItem('nlpResults', JSON.stringify(data));
+                localStorage.setItem('policyId', policyId);
+                localStorage.setItem('processingFile', file.name);
 
                 setApiData(data);
 

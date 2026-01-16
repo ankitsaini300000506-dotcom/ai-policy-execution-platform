@@ -4,14 +4,17 @@ import axios from 'axios';
 // NLP BACKEND API
 // ========================================
 
-const API_BASE = "https://eighty-clubs-stop.loca.lt";
+// ⚠️ UPDATE THIS URL when your backend tunnel restarts!
+// Current: Stable Ngrok URL (https://chiliadal-jamika-flockier.ngrok-free.dev)
+const API_BASE = "https://chiliadal-jamika-flockier.ngrok-free.dev";
 
-// Create client instance with the Bypass header
+// Create client instance with the Ngrok Bypass header
 const client = axios.create({
     baseURL: API_BASE,
     headers: {
-        'Bypass-Tunnel-Reminder': 'true' // CRITICAL for localtunnel
-    }
+        'ngrok-skip-browser-warning': 'true' // CRITICAL for Ngrok free tier
+    },
+    timeout: 300000 // 5 minutes timeout for large PDF processing
 });
 
 export interface NLPRule {
@@ -34,9 +37,8 @@ export const uploadPolicy = async (file: File, policyId: string): Promise<NLPRes
     formData.append('file', file);
     formData.append('policy_id', policyId);
 
-    const response = await client.post('/api/policy/process', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    // Let axios/browser set the Content-Type with the correct boundary
+    const response = await client.post('/api/policy/process', formData);
     return response.data;
 };
 
@@ -289,6 +291,70 @@ export const downloadNLPResultPDF = async (resultId: string, fileName?: string):
         console.error('❌ Error downloading PDF:', error);
         throw error;
     }
+};
+
+// ========================================
+// DASHBOARD ANALYTICS API
+// ========================================
+
+export const fetchPerformanceStats = async () => {
+    // TODO: Replace with actual API call: GET /analytics/performance
+    // const response = await api.get('/analytics/performance');
+    // return response.data;
+
+    // Mock data for now
+    return {
+        range: '7d',
+        data: [
+            { name: 'Mon', uploads: 45, processed: 42, exported: 38 },
+            { name: 'Tue', uploads: 52, processed: 48, exported: 45 },
+            { name: 'Wed', uploads: 61, processed: 58, exported: 54 },
+            { name: 'Thu', uploads: 48, processed: 45, exported: 42 },
+            { name: 'Fri', uploads: 73, processed: 70, exported: 67 },
+            { name: 'Sat', uploads: 38, processed: 35, exported: 32 },
+            { name: 'Sun', uploads: 29, processed: 27, exported: 24 }
+        ]
+    };
+};
+
+export const fetchStorageStats = async () => {
+    // TODO: Replace with actual API call: GET /system/storage
+    return {
+        total_storage_gb: 100,
+        used_storage_gb: 97.6,
+        available_gb: 2.4,
+        breakdown: [
+            { name: 'Documents', value: 45.2, color: '#00FFFF' },
+            { name: 'Processed Data', value: 28.7, color: '#8A2BE2' },
+            { name: 'Exports', value: 15.3, color: '#00FF88' },
+            { name: 'Cache', value: 8.4, color: '#FF6B00' },
+            { name: 'Available', value: 2.4, color: '#2A2A2A' }
+        ]
+    };
+};
+
+export const fetchAPIUsage = async () => {
+    // TODO: Replace with actual API call: GET /system/api-usage
+    return {
+        endpoints: [
+            { name: '/api/upload', calls: 1247, avgResponse: '145ms', successRate: '99.2%', status: 'healthy' },
+            { name: '/api/process', calls: 1189, avgResponse: '2.4s', successRate: '98.7%', status: 'healthy' },
+            { name: '/api/extract-rules', calls: 1189, avgResponse: '1.8s', successRate: '97.3%', status: 'warning' },
+            { name: '/api/export', calls: 1124, avgResponse: '320ms', successRate: '99.8%', status: 'healthy' }
+        ]
+    };
+};
+
+export const fetchSystemHealth = async () => {
+    // TODO: Replace with actual API call: GET /system/health
+    return {
+        metrics: [
+            { name: 'API Response Time', status: 'healthy', value: '124ms avg', icon: 'ClockIcon' },
+            { name: 'Database Performance', status: 'healthy', value: '99.9% uptime', icon: 'CircleStackIcon' },
+            { name: 'WebGL Rendering', status: 'healthy', value: '60 FPS', icon: 'CpuChipIcon' },
+            { name: 'Memory Usage', status: 'warning', value: '78% utilized', icon: 'ServerIcon' }
+        ]
+    };
 };
 
 export default client;

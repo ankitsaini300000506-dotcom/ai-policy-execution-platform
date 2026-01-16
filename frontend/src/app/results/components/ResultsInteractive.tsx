@@ -25,44 +25,75 @@ const generateMockData = (filename: string) => {
 
 const ResultsInteractive = () => {
   const router = useRouter();
-  const [showConfetti, setShowConfetti] = useState(true); // Start with celebrations
-  const [fileName, setFileName] = useState('Policy_Document_2026.pdf');
-  const [stats, setStats] = useState(generateMockData('Policy_Document_2026.pdf'));
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [stats, setStats] = useState({ rules: 0, confidence: 0, reduction: 0, time: '0s', fps: 0 });
   const [resultId, setResultId] = useState<string | null>(null);
+  const [hasValidData, setHasValidData] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      setIsLoading(true);
+
+      // Check for current session data
       const storedFile = localStorage.getItem('processingFile');
-      if (storedFile) {
-        setFileName(storedFile);
-      }
-
+      const storedResults = localStorage.getItem('nlpResults');
       const storedResultId = localStorage.getItem('nlpResultId');
-      if (storedResultId) {
-        setResultId(storedResultId);
+      const policyId = localStorage.getItem('policyId');
+
+      // Validate session data exists
+      if (!storedFile || !storedResults || !policyId) {
+        console.warn('⚠️ No valid session data found. Showing empty state.');
+        setHasValidData(false);
+        setIsLoading(false);
+        return;
       }
 
-      // Read real results from the API
-      const storedResults = localStorage.getItem('processingResults');
-      if (storedResults) {
-        try {
-          const data = JSON.parse(storedResults);
-          if (data.stats) {
-            setStats({
-              rules: data.stats.rules || 0,
-              confidence: data.stats.confidence || 0,
-              reduction: data.stats.reduction || 85,
-              time: data.stats.time || '2m 30s',
-              fps: data.stats.fps || 60
-            });
-          }
-        } catch (e) {
-          console.error('Failed to parse processing results', e);
-          if (storedFile) setStats(generateMockData(storedFile));
+      try {
+        const data = JSON.parse(storedResults);
+
+        // Validate data structure
+        if (!data || !data.policy_id) {
+          console.warn('⚠️ Invalid data structure. Showing empty state.');
+          setHasValidData(false);
+          setIsLoading(false);
+          return;
         }
-      } else if (storedFile) {
-        setStats(generateMockData(storedFile));
+
+        // Data is valid - populate state
+        setFileName(storedFile);
+        setResultId(storedResultId);
+        setHasValidData(true);
+        setShowConfetti(true);
+
+        // Extract stats from NLP response
+        if (data.stats) {
+          setStats({
+            rules: data.stats.rules || data.rules?.length || 0,
+            confidence: data.stats.confidence || 96,
+            reduction: data.stats.reduction || 85,
+            time: data.stats.time || '2m 30s',
+            fps: data.stats.fps || 60
+          });
+        } else if (data.rules) {
+          // Fallback: calculate from rules array
+          setStats({
+            rules: data.rules.length,
+            confidence: 96,
+            reduction: 85,
+            time: '2m 30s',
+            fps: 60
+          });
+        }
+
+        console.log('✅ Valid session data loaded');
+      } catch (e) {
+        console.error('❌ Failed to parse processing results:', e);
+        setHasValidData(false);
       }
+
+      setIsLoading(false);
 
       // Auto-dismiss confetti after 4s
       const timer = setTimeout(() => setShowConfetti(false), 4000);
@@ -120,6 +151,68 @@ const ResultsInteractive = () => {
       alert(`${format.toUpperCase()} export is coming soon!`);
     }
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground font-jetbrains">Loading results...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state - no valid data
+  if (!hasValidData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="max-w-2xl w-full text-center space-y-8">
+          <div className="space-y-4">
+            <div className="w-24 h-24 mx-auto rounded-full bg-muted flex items-center justify-center">
+              <Icon name="DocumentTextIcon" size={48} className="text-muted-foreground" />
+            </div>
+            <h1 className="text-4xl font-bold font-orbitron text-foreground">
+              No Results Available
+            </h1>
+            <p className="text-lg text-muted-foreground font-inter max-w-md mx-auto">
+              Please upload and process a policy document first to see the transformation results.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={() => router.push('/upload')}
+              className="px-8 py-4 bg-cyan-500 hover:bg-cyan-400 text-black font-bold font-orbitron rounded-xl transition-all hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/20 flex items-center justify-center gap-2"
+            >
+              <Icon name="ArrowUpTrayIcon" size={20} />
+              Upload Policy Document
+            </button>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="px-8 py-4 bg-card hover:bg-muted text-foreground font-bold font-orbitron rounded-xl transition-all hover:scale-105 border border-white/10"
+            >
+              Go to Dashboard
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-8 py-4 bg-card hover:bg-muted text-foreground font-bold font-orbitron rounded-xl transition-all hover:scale-105 border border-white/10 flex items-center justify-center gap-2"
+            >
+              <Icon name="ArrowPathIcon" size={20} />
+              Reload Data
+            </button>
+          </div>
+
+          <div className="pt-8 border-t border-white/5">
+            <p className="text-sm text-muted-foreground font-jetbrains">
+              💡 Tip: The Results page displays metrics and analytics after your policy document has been processed through our AI engine.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground spay-y-8 pb-20">
